@@ -1,26 +1,43 @@
 import re
 import requests
+from bs4 import BeautifulSoup
 import os
 
-# 放你网易云的复制链接到这里， 形式 链接：歌的名字
-songs = {
-    "https://music.163.com/song?id=1907868691&userid=514157754": "地基街头",
-    "https://music.163.com/dj?id=2535580578&userid=514157754": "upNeverdown",
-    "https://music.163.com/song?id=2148786274&userid=514157754": "KASABLANCA",
-    "https://music.163.com/song?id=2146490314&userid=514157754" : "BRAZIL",
-    "https://music.163.com/song?id=2009226782&userid=514157754" : "BAD BAD",
-    # Add more entries as needed
-}
+# 网易云音乐链接列表
+songs = [
+    "https://music.163.com/song?id=2042350565&userid=9834375319",
+    "https://music.163.com/song?id=1832633339&userid=9834375319",
+    "https://music.163.com/song?id=2139033163&userid=9834375319",
+    # Add more URLs as needed
+]
 
 def process_links(songs):
     new_urls = []
-    for link in songs.keys():
+    for link in songs:
         match = re.search(r"id=(\d+)", link)
         if match:
             song_id = match.group(1)
             new_url = f"http://music.163.com/song/media/outer/url?id={song_id}.mp3"
-            new_urls.append((new_url, songs[link]))
+            song_name = fetch_song_title(link)
+            new_urls.append((new_url, song_name))
     return new_urls
+
+def fetch_song_title(song_url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+    }
+    response = requests.get(song_url, headers=headers)
+    
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'lxml')
+        # Look for the title tag or any meta tag containing the song name
+        title_tag = soup.find('title')
+        if title_tag:
+            # Clean up the title by removing any extra text (like "网易云音乐" or "- 网易云音乐")
+            title = title_tag.text.strip().split('-')[0].strip()
+            print(f"Found song title: {title}")
+            return title
+    return "Unknown Title"
 
 def download_and_rename_mp3(songs_info):
     for url, name in songs_info:
@@ -32,7 +49,11 @@ def download_and_rename_mp3(songs_info):
                     f.write(chunk)
             final_name = f"{name}.mp3"
             os.rename(temp_file_name, final_name)
-            print(f'Downloaded and renamed to: {final_name}, 文件在你这个文件一样的目录里')
+
+            # Get absolute path of the saved file
+            final_path = os.path.abspath(final_name)
+            print(f'Downloaded and renamed to: {final_name}')
+            print(f'File stored at: （文件放在了:） {final_path}')
         else:
             print(f'Failed to download from {url}')
 
